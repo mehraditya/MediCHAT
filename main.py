@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import re
 
 
 app = FastAPI()
@@ -22,12 +23,36 @@ def validate_message(text: str) -> None:
         detail = "Message is too short"
     )
 
+#language detection 
+def detect_language(text: str) ->str:
+    #Hindi
+    if re.search(r'[\u0900-\u097F]', text):
+        return "hindi"
+    
+    hinglish_keys = ["hai","nahi","kyun","kya","kaise","haan","problem","stress","tension"
+    ]
+
+    lowered = text.lower()
+    for word in hinglish_keys:
+        if word in lowered:
+            return "hinglish"
+    return "english"
+    
+#response generation
+# def generate_reply(text: str, language: str) ->str:
+
+def process_message(text: str) ->tuple[str, str]:  
+    language = detect_language(text)
+    reply = generate_reply(text, language)
+    return reply, language   
+
 @app.post("/message", response_model = MessageResponse)
 def send_message(payload: MessageRequest):
     #accept user response and return response
     #validating message
     validate_message(payload.message)
+    reply, language = process_message(payload.message)
     return MessageResponse(
-        reply = "Received messaage",
-        language = "unknown"
+        reply = reply,
+        language = language
     )

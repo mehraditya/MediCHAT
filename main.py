@@ -39,12 +39,21 @@ def detect_language(text: str) ->str:
     return "english"
     
 #response generation
-# def generate_reply(text: str, language: str) ->str:
+def generate_reply(text: str, language: str) ->str:
+    if language == "hi":
+        return "मैं समझ सकता हूँ कि आप कैसा महसूस कर रहे हैं। क्या आप इसके बारे में बात करना चाहेंगे?"
+
+    if language == "hinglish":
+        return "Samajh aa raha hai, aap thoda stressed lag rahe ho. Chaaho toh baat kar sakte hain."
+
+    # default
+    return "I understand that you're feeling this way. Would you like to talk more about it?"
 
 def process_message(text: str) ->tuple[str, str]:  
     language = detect_language(text)
     reply = generate_reply(text, language)
     return reply, language   
+
 
 @app.post("/message", response_model = MessageResponse)
 def send_message(payload: MessageRequest):

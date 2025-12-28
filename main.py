@@ -1,9 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import re
+from typing import List
+
 
 
 app = FastAPI()
+
+message_log: List[dict] = []
 
 class MessageRequest(BaseModel):
     message:str
@@ -60,8 +64,39 @@ def send_message(payload: MessageRequest):
     #accept user response and return response
     #validating message
     validate_message(payload.message)
+
     reply, language = process_message(payload.message)
+
+    #for memory 
+    message_log.append({
+        "user_message": payload.message,
+        "reply": reply,
+        "language": language
+    })
+
     return MessageResponse(
         reply = reply,
         language = language
     )
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok"
+        "service: medichat-backend"
+    }
+
+@app.get("/messages")
+def get_messages():
+    return {
+        "count": len(message_log),
+        "messages": message_log
+    }
+
+@app.delete("/messages")
+def delete_message():
+    message_log.clear()
+    return {
+        "status": "cleared",
+        "count": 0
+    }

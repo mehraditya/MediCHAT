@@ -1,13 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel
 import re
-from typing import List
+from typing import List, Optional
+from time import perf_counter
+
 
 
 
 app = FastAPI()
 
+v1_router = APIRouter(prefix="/v1") 
+
 message_log: List[dict] = []
+
+class ResponseMeta_data(BaseModel):
+    model: Optional[str] = None
+    confidence: Optional[float] = None
+    processing_time: Optional[int] = None
 
 class MessageRequest(BaseModel):
     message:str
@@ -15,6 +24,7 @@ class MessageRequest(BaseModel):
 class MessageResponse(BaseModel):
     reply:str
     language:str
+    meta: Optional[ResponseMeta_data] = None
 
 def validate_message(text: str) -> None:
     cleaned = text.strip() 
@@ -59,13 +69,18 @@ def process_message(text: str) ->tuple[str, str]:
     return reply, language   
 
 
-@app.post("/message", response_model = MessageResponse)
+@v1_router.post("/message", response_model = MessageResponse)
 def send_message(payload: MessageRequest):
     #accept user response and return response
+    start = perf_counter()
     #validating message
     validate_message(payload.message)
 
+
     reply, language = process_message(payload.message)
+
+    #for response time
+    elapsed_time = int((perf_counter() - start) *1000)
 
     #for memory 
     message_log.append({
@@ -76,27 +91,33 @@ def send_message(payload: MessageRequest):
 
     return MessageResponse(
         reply = reply,
-        language = language
+        language = language,
+        meta = ResponseMeta_data(
+            model = "rule-based",
+            processing_time = elapsed_time
+        )
     )
 
-@app.get("/health")
+@v1_router.get("/health")
 def health_check():
     return {
         "status": "ok"
         "service: medichat-backend"
     }
 
-@app.get("/messages")
+@v1_router.get("/messages")
 def get_messages():
     return {
         "count": len(message_log),
         "messages": message_log
     }
 
-@app.delete("/messages")
+@v1_router.delete("/messages")
 def delete_message():
     message_log.clear()
     return {
         "status": "cleared",
         "count": 0
     }
+
+app.include_router(v1_router)

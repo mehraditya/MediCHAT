@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import re
 from typing import List, Optional
 from time import perf_counter
+from model_service import generate_reply
 
 
 
@@ -16,7 +17,7 @@ message_log: List[dict] = []
 class ResponseMeta_data(BaseModel):
     model: Optional[str] = None
     confidence: Optional[float] = None
-    processing_time: Optional[int] = None
+    processing_time_ms: Optional[int] = None
 
 class MessageRequest(BaseModel):
     message:str
@@ -52,21 +53,11 @@ def detect_language(text: str) ->str:
             return "hinglish"
     return "english"
     
-#response generation
-def generate_reply(text: str, language: str) ->str:
-    if language == "hi":
-        return "मैं समझ सकता हूँ कि आप कैसा महसूस कर रहे हैं। क्या आप इसके बारे में बात करना चाहेंगे?"
 
-    if language == "hinglish":
-        return "Samajh aa raha hai, aap thoda stressed lag rahe ho. Chaaho toh baat kar sakte hain."
-
-    # default
-    return "I understand that you're feeling this way. Would you like to talk more about it?"
-
-def process_message(text: str) ->tuple[str, str]:  
+def process_message(text: str) ->tuple[str, str, str]:  
     language = detect_language(text)
-    reply = generate_reply(text, language)
-    return reply, language   
+    reply, model_name = generate_reply(text, language)
+    return reply, language, model_name   
 
 
 @v1_router.post("/message", response_model = MessageResponse)
@@ -77,7 +68,7 @@ def send_message(payload: MessageRequest):
     validate_message(payload.message)
 
 
-    reply, language = process_message(payload.message)
+    reply, language, model_name = process_message(payload.message)
 
     #for response time
     elapsed_time = int((perf_counter() - start) *1000)
@@ -86,15 +77,16 @@ def send_message(payload: MessageRequest):
     message_log.append({
         "user_message": payload.message,
         "reply": reply,
-        "language": language
+        "language": language,
+        "model": model_name
     })
 
     return MessageResponse(
         reply = reply,
         language = language,
         meta = ResponseMeta_data(
-            model = "rule-based",
-            processing_time = elapsed_time
+            model = model_name,
+            processing_time_ms = elapsed_time
         )
     )
 

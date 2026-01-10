@@ -2,6 +2,8 @@ import os
 import random
 import time
 from transformers import pipeline
+from safety_service import is_safe, safe_fallback
+
 class ModelError(Exception):
     pass
 
@@ -54,14 +56,25 @@ def generate_reply(text: str, language:str) ->tuple[str,str]:
 
     active_model = os.getenv("MEDCHAT_MODEL","dummy")
     try:
-        if active_model =="rule":return _rule_based_model(text, language),"rule-based"
+        if active_model =="rule":
+            reply = _rule_based_model(text, language)
+            model_name ="rule-based"
 
-        if active_model =="dummy":return _dummy_ml_model(text, language),"dummy-ml"
+        elif active_model =="dummy":
+            reply = _dummy_ml_model(text, language)
+            model_name ="dummy-ml"
 
-        if active_model =="real":return _real_model(text, language), "real_model"
+        elif active_model =="real":
+            reply = _real_model(text, language)
+            model_name ="real-ml"
 
-        # future real model
-        return _rule_based_model(text, language),"fallback"
+        else:
+            reply = _rule_based_model(text, language)
+            model_name ="fallback"
 
-    except ModelError:return ("I’m here to listen. Could you try explaining that a bit more?","fallback"
-        )
+    except ModelError:return safe_fallback(language),"fallback"
+
+    if not is_safe(reply):
+        return safe_fallback(language), "safety-fallback"
+    
+    return reply, model_name
